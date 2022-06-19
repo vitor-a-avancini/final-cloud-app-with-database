@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponseRedirect
 # <HINT> Import any new Models here
-from .models import Course, Enrollment
+from .models import Course, Enrollment, Question, Choice, Submission
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
@@ -117,10 +117,10 @@ def submit(request, course_id):
     
     submission = Submission.objects.create(enrollment=enrollment)
     answers = extract_answers(request)
-    submission.chocies.set(answers)
+    submission.choices.set(answers)
     submission.save()
 
-    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(submission.id,)))
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(course.id,submission.id,)))
 
 # <HINT> A example method to collect the selected choices from the exam form from the request object
 def extract_answers(request):
@@ -140,17 +140,16 @@ def extract_answers(request):
         # For each selected choice, check if it is a correct answer or not
         # Calculate the total score
 def show_exam_result(request, course_id, submission_id):
-    course = get_object_or_404(Course, pk=course_id)
-    submission = get_object_or_404(Submission, pk=submission_id)
-    answers = submission.objects.all()
-    grade = 0.0
-    for answer in answers.choice_set:
-        if answer.is_correct:
-            grade += answer.question.grade
-    context ={
-        'course': course,
-        'grade':grade
-        }
-    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
+    context = {}
+    course = Course.objects.get(id = course_id)
+    submit = Submission.objects.get(id = submission_id)
+    selected = Submission.objects.filter(id = submission_id).values_list('choices',flat = True)
+    score = 0
+    for i in submit.choices.all().filter(is_correct=True).values_list('question_id'):
+        score += Question.objects.filter(id=i[0]).first().grade    
+    context['selected'] = selected
+    context['grade'] = score
+    context['course'] = course
+    return  render(request, 'onlinecourse/exam_result_bootstrap.html', context)
 
 
